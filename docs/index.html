@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SGLINK</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>SGLINK</h1>
+      <p class="sub">Short links, redirected by a Worker at <code id="worker-url"></code></p>
+    </header>
+
+    <section class="card">
+      <h2>API key</h2>
+      <p class="hint">Set on your Worker via <code>wrangler secret put API_KEY</code>. Stored only in this browser's local storage, never in the repo.</p>
+      <div class="row">
+        <input id="api-key" type="password" placeholder="paste your API key" autocomplete="off" />
+        <button id="save-key">Save</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>New link</h2>
+      <form id="create-form" class="row">
+        <input id="target-url" type="url" placeholder="https://example.com/long/path" required />
+        <input id="custom-slug" type="text" placeholder="custom slug (optional)" />
+        <button type="submit">Shorten</button>
+      </form>
+    </section>
+
+    <p id="error" class="error" role="alert"></p>
+
+    <section class="card">
+      <h2>Your links</h2>
+      <p id="empty-state" class="hint" hidden>No links yet. Save an API key and create one above.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Slug</th>
+            <th>Target</th>
+            <th>Clicks</th>
+            <th></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="link-list"></tbody>
+      </table>
+    </section>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
