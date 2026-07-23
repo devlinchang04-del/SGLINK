@@ -1,0 +1,238 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Auth (NextAuth) ----------
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String? // bcrypt hash, null for OAuth-only users
+  createdAt     DateTime  @default(now())
+
+  accounts    Account[]
+  sessions    Session[]
+  memberships WorkspaceUser[]
+  links       Link[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ---------- Workspaces / Teams ----------
+
+enum Plan {
+  FREE
+  PRO
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+model Workspace {
+  id     String @id @default(cuid())
+  name   String
+  slug   String @unique
+  plan   Plan   @default(FREE)
+
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+  stripePriceId        String?
+  stripeCurrentPeriodEnd DateTime?
+
+  linksLimit  Int @default(25)
+  clicksLimit Int @default(1000)
+
+  createdAt DateTime @default(now())
+
+  members WorkspaceUser[]
+  domains Domain[]
+  links   Link[]
+  tags    Tag[]
+  folders Folder[]
+  apiKeys ApiKey[]
+  invites Invite[]
+}
+
+model WorkspaceUser {
+  id          String   @id @default(cuid())
+  userId      String
+  workspaceId String
+  role        Role     @default(MEMBER)
+  createdAt   DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+}
+
+model Invite {
+  id          String   @id @default(cuid())
+  workspaceId String
+  email       String
+  role        Role     @default(MEMBER)
+  token       String   @unique
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, email])
+}
+
+// ---------- Domains ----------
+
+model Domain {
+  id                 String   @id @default(cuid())
+  workspaceId        String
+  slug               String   @unique // e.g. "links.acme.com"
+  verified           Boolean  @default(false)
+  verificationToken  String   @default(cuid())
+  createdAt          DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  links     Link[]
+}
+
+// ---------- Links ----------
+
+model Tag {
+  id          String @id @default(cuid())
+  workspaceId String
+  name        String
+  color       String @default("blue")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  links     Link[]
+
+  @@unique([workspaceId, name])
+}
+
+model Folder {
+  id          String @id @default(cuid())
+  workspaceId String
+  name        String
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  links     Link[]
+
+  @@unique([workspaceId, name])
+}
+
+model Link {
+  id          String  @id @default(cuid())
+  workspaceId String
+  domainId    String?
+  key         String // short slug, e.g. "dewibulans"
+  url         String // destination URL
+  title       String?
+  description String?
+  image       String?
+
+  password  String? // bcrypt hash, optional link password protection
+  expiresAt DateTime?
+  archived  Boolean   @default(false)
+
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmTerm     String?
+  utmContent  String?
+
+  clicks Int @default(0)
+
+  folderId  String?
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspace Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  domain    Domain?      @relation(fields: [domainId], references: [id])
+  folder    Folder?      @relation(fields: [folderId], references: [id])
+  creator   User?        @relation(fields: [createdBy], references: [id])
+  tags      Tag[]
+  events    ClickEvent[]
+
+  @@unique([domainId, key])
+  @@index([workspaceId])
+}
+
+model ClickEvent {
+  id        String   @id @default(cuid())
+  linkId    String
+  createdAt DateTime @default(now())
+
+  country   String?
+  city      String?
+  region    String?
+  continent String?
+
+  device        String? // Desktop | Mobile | Tablet
+  deviceVendor  String?
+  browser       String?
+  os            String?
+  referrer      String? // hostname of referrer, "(direct)" if none
+
+  link Link @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@index([linkId, createdAt])
+}
+
+// ---------- API Keys ----------
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  keyPrefix   String // first chars shown in UI, e.g. "sg_live_ab12"
+  hashedKey   String    @unique
+  lastUsedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
