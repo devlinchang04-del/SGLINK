@@ -32,6 +32,34 @@ export function LinksClient({
   const [showCreate, setShowCreate] = useState(false);
   const [qrFor, setQrFor] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [editError, setEditError] = useState("");
+
+  function startEdit(link: LinkRow) {
+    setEditingId(link.id);
+    setEditValue(link.url);
+    setEditError("");
+  }
+
+  async function saveEdit(link: LinkRow) {
+    if (editValue === link.url) {
+      setEditingId(null);
+      return;
+    }
+    const res = await fetch(`/api/w/${workspaceSlug}/links/${link.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: editValue }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setEditError(data.error ?? "Invalid URL");
+      return;
+    }
+    setLinks((cur) => cur.map((l) => (l.id === link.id ? { ...l, url: data.url } : l)));
+    setEditingId(null);
+  }
 
   async function copy(link: LinkRow) {
     await navigator.clipboard.writeText(shortUrlFor(link.domain?.slug ?? null, link.key));
@@ -93,7 +121,32 @@ export function LinksClient({
                     </div>
                   )}
                 </td>
-                <td className="max-w-xs truncate px-4 py-3 text-neutral-500">{link.url}</td>
+                <td className="max-w-xs px-4 py-3 text-neutral-500">
+                  {editingId === link.id ? (
+                    <div>
+                      <input
+                        autoFocus
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") saveEdit(link);
+                          if (e.key === "Escape") setEditingId(null);
+                        }}
+                        onBlur={() => saveEdit(link)}
+                        className="w-full rounded border border-neutral-300 px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+                      />
+                      {editError && <p className="mt-1 text-xs text-red-500">{editError}</p>}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => startEdit(link)}
+                      title="Click to edit destination URL"
+                      className="block w-full truncate text-left hover:underline"
+                    >
+                      {link.url}
+                    </button>
+                  )}
+                </td>
                 <td className="px-4 py-3">{formatNumber(link.clicks)}</td>
                 <td className="px-4 py-3 text-neutral-400">{timeAgo(link.createdAt)}</td>
                 <td className="px-4 py-3">
