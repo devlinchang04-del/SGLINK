@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { X } from "lucide-react";
 import { ClicksChart } from "@/components/analytics/clicks-chart";
 import { TopList } from "@/components/analytics/top-list";
 import { shortUrlFor } from "@/lib/domains";
@@ -24,7 +26,16 @@ const RANGE_LABELS: Record<Range, string> = {
   "90d": "Last 90 days",
 };
 
-export function AnalyticsClient({ workspaceSlug, linkId }: { workspaceSlug: string; linkId?: string }) {
+export function AnalyticsClient({
+  workspaceSlug,
+  linkId,
+  linkLabel,
+}: {
+  workspaceSlug: string;
+  linkId?: string;
+  linkLabel?: string | null;
+}) {
+  const router = useRouter();
   const [range, setRange] = useState<Range>("24h");
   const [data, setData] = useState<AnalyticsData | null>(null);
 
@@ -54,9 +65,28 @@ export function AnalyticsClient({ workspaceSlug, linkId }: { workspaceSlug: stri
         </div>
       </div>
 
+      {linkId && linkLabel && (
+        <div className="mb-4 flex items-center gap-2">
+          <span className="flex items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-50 py-1 pl-3 pr-1.5 text-sm dark:border-neutral-800 dark:bg-neutral-900">
+            <span className="text-neutral-400">Link is</span>
+            <span className="font-medium">{linkLabel}</span>
+            <button
+              onClick={() => router.push(`/${workspaceSlug}/analytics`)}
+              className="rounded-full p-0.5 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700 dark:hover:bg-neutral-800"
+              title="Clear filter"
+            >
+              <X size={13} />
+            </button>
+          </span>
+        </div>
+      )}
+
       <div className="rounded-xl border border-neutral-200 opacity-100 transition-opacity dark:border-neutral-800" style={{ opacity: data ? 1 : 0.5 }}>
-        <div className="border-b border-neutral-200 px-6 py-3 dark:border-neutral-800">
-          <p className="text-sm text-neutral-500">Clicks</p>
+        <div className="border-b-2 border-neutral-900 px-6 py-3 dark:border-white">
+          <p className="flex items-center gap-1.5 text-sm text-neutral-500">
+            <span className="h-2 w-2 rounded-sm bg-brand-500" />
+            Clicks
+          </p>
           <p className="text-3xl font-semibold tabular-nums">{formatNumber(data?.totalClicks ?? 0)}</p>
         </div>
         <div className="p-4">

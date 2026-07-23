@@ -27,7 +27,7 @@ export function ClicksChart({ series, range }: { series: Point[]; range: "24h" |
     [series, innerW, innerH, niceMax]
   );
 
-  const linePath = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+  const linePath = smoothPath(points);
   const areaPath = points.length
     ? `${linePath} L ${points[points.length - 1].x} ${innerH} L ${points[0].x} ${innerH} Z`
     : "";
@@ -91,7 +91,13 @@ export function ClicksChart({ series, range }: { series: Point[]; range: "24h" |
             );
           })}
 
-          {areaPath && <path d={areaPath} fill="var(--series-1)" opacity={0.1} stroke="none" />}
+          <defs>
+            <linearGradient id="clicks-area-fill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--series-1)" stopOpacity={0.22} />
+              <stop offset="100%" stopColor="var(--series-1)" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          {areaPath && <path d={areaPath} fill="url(#clicks-area-fill)" stroke="none" />}
           {linePath && <path d={linePath} fill="none" stroke="var(--series-1)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />}
 
           {points.length > 0 && (
@@ -128,6 +134,25 @@ export function ClicksChart({ series, range }: { series: Point[]; range: "24h" |
       )}
     </div>
   );
+}
+
+function smoothPath(points: { x: number; y: number }[]) {
+  if (points.length === 0) return "";
+  if (points.length < 3) return points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+
+  let d = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1] ?? points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] ?? p2;
+    const c1x = p1.x + (p2.x - p0.x) / 6;
+    const c1y = p1.y + (p2.y - p0.y) / 6;
+    const c2x = p2.x - (p3.x - p1.x) / 6;
+    const c2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p2.x} ${p2.y}`;
+  }
+  return d;
 }
 
 function niceCeil(n: number) {
